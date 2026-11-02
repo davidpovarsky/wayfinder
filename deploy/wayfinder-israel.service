@@ -1,0 +1,22 @@
+[Unit]
+Description=Wayfinder Israel web frontend (isolated staging)
+After=network-online.target wayfinder-oba-israel.service
+Wants=network-online.target
+Requires=wayfinder-oba-israel.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/wayfinder-israel
+Environment=NODE_ENV=production
+Environment=PORT=8771
+Environment=HOST=127.0.0.1
+ExecStart=/usr/local/bin/node --env-file=/home/ubuntu/wayfinder-israel/.env /home/ubuntu/wayfinder-israel/build/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

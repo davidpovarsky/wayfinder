@@ -1,0 +1,6 @@
+# Wayfinder Israel staging frontend; OneBusAway bridge stays on loopback.
+wayfinder-130-110-238-163.nip.io {
+    header X-Robots-Tag "noindex, nofollow, noarchive"
+    header X-Content-Type-Options "nosniff"
+    reverse_proxy 127.0.0.1:8771
+}
