@@ -28,3 +28,9 @@ coverage/
 .claude/settings.local.json
 env-files
 .playwright-mcp
+# Local Israel bridge runtime / safe-edit backups
+__pycache__/
+*.pyc
+*.bak.*
+*.log
+israel-compat/*.pid

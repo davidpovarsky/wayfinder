@@ -16,6 +16,7 @@
  */
 import { init, addMessages, register, getLocaleFromNavigator, locale } from 'svelte-i18n';
 import { browser } from '$app/environment';
+import { env } from '$env/dynamic/public';
 
 // Language metadata - single source of truth
 export const languages = [
@@ -26,6 +27,7 @@ export const languages = [
 	{ code: 'fa', nativeName: 'فارسی', englishName: 'Persian' },
 	{ code: 'fr', nativeName: 'Français', englishName: 'French' },
 	{ code: 'hi', nativeName: 'हिन्दी', englishName: 'Hindi' },
+	{ code: 'he', nativeName: 'עברית', englishName: 'Hebrew' },
 	{ code: 'ht', nativeName: 'Kreyòl ayisyen', englishName: 'Haitian Creole' },
 	{ code: 'ja', nativeName: '日本語', englishName: 'Japanese' },
 	{ code: 'km', nativeName: 'ភាសាខ្មែរ', englishName: 'Khmer' },
@@ -60,6 +62,7 @@ register('es', () => import('../locales/es.json').then((m) => m.default));
 register('fa', () => import('../locales/fa.json').then((m) => m.default));
 register('fr', () => import('../locales/fr.json').then((m) => m.default));
 register('hi', () => import('../locales/hi.json').then((m) => m.default));
+register('he', () => import('../locales/he.json').then((m) => m.default));
 register('ht', () => import('../locales/ht.json').then((m) => m.default));
 register('ja', () => import('../locales/ja.json').then((m) => m.default));
 register('km', () => import('../locales/km.json').then((m) => m.default));
@@ -94,7 +97,7 @@ export function getInitialLocale() {
 	}
 
 	// Fallback to browser language (getLocaleFromNavigator handles fallback via fallbackLocale)
-	return getLocaleFromNavigator() || 'en';
+	return env.PUBLIC_DEFAULT_LOCALE || getLocaleFromNavigator() || 'en';
 }
 
 // Initialize synchronously with the fallback locale, the only dictionary loaded

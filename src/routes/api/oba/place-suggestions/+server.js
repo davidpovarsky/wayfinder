@@ -15,7 +15,7 @@ export async function GET({ url }) {
 
 	const bounds = getBoundsCache();
 
-	const suggestions = await fetchAutocompleteResults(
+	const suggestions = !geocoderApiKey ? [] : await fetchAutocompleteResults(
 		geocoderProvider,
 		searchInput,
 		geocoderApiKey,

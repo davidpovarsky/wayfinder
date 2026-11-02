@@ -33,6 +33,8 @@ async function stopSearch(query) {
 }
 
 async function locationSearch(query, bounds) {
+	// Israel uses the MOT local station catalogue when no Google/Bing geocoder is configured.
+	if (!geocoderApiKey) return [];
 	if (geocoderProvider === 'google') {
 		return googleGeocode({ apiKey: geocoderApiKey, query, bounds });
 	} else if (geocoderProvider === 'bing') {

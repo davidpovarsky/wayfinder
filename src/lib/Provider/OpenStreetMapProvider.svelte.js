@@ -32,6 +32,11 @@ const LIGHT_STYLE = 'positron';
 const DARK_STYLE = 'fiord';
 
 function styleUrl(name) {
+	const token = env.PUBLIC_MAPBOX_TOKEN;
+	if (typeof token === 'string' && token.startsWith('pk.')) {
+		const style = name === DARK_STYLE ? 'dark-v11' : 'streets-v12';
+		return `https://api.mapbox.com/styles/v1/mapbox/${style}?access_token=${encodeURIComponent(token)}`;
+	}
 	return `https://tiles.openfreemap.org/styles/${name}`;
 }
 
