@@ -26,6 +26,12 @@
 	config.autoAddCss = false; // Tell Font Awesome to skip adding the CSS automatically since it's being imported above
 
 	onMount(() => {
+		// Works both in an ordinary browser and Telegram's integrated WebView.
+		const miniApp = window.Telegram?.WebApp;
+		if (miniApp) {
+			miniApp.ready();
+			miniApp.expand();
+		}
 		initSystemTheme();
 
 		locale.subscribe((lang) => {
