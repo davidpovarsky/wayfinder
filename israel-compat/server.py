@@ -209,6 +209,39 @@ def stop_and_routes(code, requested=None):
     return serialize_stop(merged, requested), routes, agencies
 
 
+def fetch_next_stop_times(live, code):
+    """Reuse iOS MOTCompatibilityDataLoader's per-route POST strategy.
+
+    HTTP responses are real, cached for 20 seconds, and bounded at four
+    concurrent requests. Missing/blocked routes produce no invented ETAs.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    routes = [r for r in live.get("routesInStop",[]) if r.get("routeDesc") and r.get("routeId")]
+    dedup = list({r["routeDesc"]:r for r in routes}.values())[:50]
+
+    def fetch_route(route):
+        desc=route["routeDesc"]
+        try:
+            data = fetch_mot("scheduler", "Routes/GetNextStopTimesAndLocation",
+                             body={"routeDesc":desc,"stopCodes":[int(code)]},ttl=20)
+            times=(data or {}).get(str(code)) or {}
+            out = []
+            for item in times.get("stopTimes") or []:
+                out.append({**item,"routeId":route["routeId"],"routeName":route.get("routeName"),
+                            "headsign":route.get("headsign") or route.get("routeLongName")})
+            return out
+        except (MOTUnavailable,AttributeError,ValueError,TypeError):
+            return []
+
+    if not dedup: return []
+    collected=[]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for future in as_completed([pool.submit(fetch_route,r) for r in dedup]):
+            try:collected.extend(future.result())
+            except Exception:pass
+    return collected
+
+
 def get_arrivals(live, stop_code_number, stop_identifier, min_before=0, min_after=60):
     """Use only genuine time fields; missing real-time data is not an ETA."""
     values, trips = [], {}
@@ -399,6 +432,9 @@ def path_result(path, q):
         raw = {}
         try: raw = stop_details(code) or {}
         except MOTUnavailable: pass
+        if raw.get("routesInStop"):
+            raw = {**raw, "stopTimes":list(raw.get("stopTimes") or [])+
+                   fetch_next_stop_times(raw,code)}
         arrivals, trips = get_arrivals(raw, code, m[1], int(q.get("minutesBefore",[0])[0]),
                                        min(720,int(q.get("minutesAfter",[60])[0])))
         return 200, envelope({"entry":{"stopId":m[1],"arrivalsAndDepartures":arrivals,

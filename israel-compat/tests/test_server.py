@@ -48,6 +48,22 @@ class APIContractTests(unittest.TestCase):
         self.assertEqual(bridge.route_id('mot:shape:33285'),33285)
         self.assertEqual(bridge.route_id('mot:route:33285'),33285)
 
+    def test_real_stop_time_endpoint_mapping(self):
+        from unittest.mock import patch
+        sample={"5997":{"stopTimes":[{
+            "arrivalTime":"2026-11-03T05:38:59","isRealTime":False,
+            "minutesToArrival":273.5}]}}
+        route={"routeId":33285,"routeDesc":"15031-1-0","routeName":"31",
+               "routeLongName":"רמות-ירושלים<->גילה"}
+        with patch.object(bridge,"fetch_mot",return_value=sample) as remote:
+            mapped=bridge.fetch_next_stop_times({"routesInStop":[route]},5997)
+        self.assertEqual(len(mapped),1)
+        self.assertEqual(mapped[0]["routeId"],33285)
+        self.assertEqual(mapped[0]["routeName"],"31")
+        self.assertFalse(mapped[0]["isRealTime"])
+        self.assertEqual(remote.call_args.kwargs.get("body"),
+                         {"routeDesc":"15031-1-0","stopCodes":[5997]})
+
     def test_no_fabricated_arrivals(self):
         sample={'routesInStop':[{'routeId':33285,'routeName':'31',
                                  'stops':[{'stopcode':5997,'nextStopsTimes':None}]}],
