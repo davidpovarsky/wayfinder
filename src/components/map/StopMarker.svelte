@@ -14,6 +14,7 @@
 	 * @property {IconDefinition} icon - Font Awesome icon for the route type
 	 * @property {boolean} [isHighlighted]
 	 * @property {boolean} [showRoutesLabel]
+ * @property {boolean} [compact] - At low zoom use light dots instead of overlapping bus icons.
 	 * @property {'full'|'routeDot'|'muted'} [emphasis] - Marker prominence, decided by the map
 	 *     layer from the current selection. `full` is today's pin.
 	 * @property {string|null} [dotColor] - Ring color for the `routeDot` tier.
@@ -27,6 +28,7 @@
 		icon,
 		isHighlighted = false,
 		showRoutesLabel = false,
+		compact = false,
 		emphasis = 'full',
 		dotColor = null
 	} = $props();
@@ -57,7 +59,7 @@
 	// The selected stop is always among the stops served by the drawn routes, so
 	// `emphasis: 'routeDot'` and `isHighlighted` collide by construction. Highlight
 	// wins: the stop the rider picked must never be the quietest thing on screen.
-	const resolvedEmphasis = $derived(isHighlighted ? 'full' : emphasis);
+	const resolvedEmphasis = $derived(isHighlighted ? 'full' : compact && emphasis === 'full' ? 'muted' : emphasis);
 	const isFullPin = $derived(resolvedEmphasis === 'full');
 
 	const labelPosition = $derived(

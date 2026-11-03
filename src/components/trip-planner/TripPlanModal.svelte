@@ -4,7 +4,7 @@
 	import ItineraryDetails from './ItineraryDetails.svelte';
 	import ItineraryTab from './ItineraryTab.svelte';
 	import TripPlan from './TripPlan.svelte';
-	import { X } from '@lucide/svelte';
+	import { X, Map as MapIcon, List } from '@lucide/svelte';
 	import { keybinding } from '$lib/keybinding';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
@@ -72,6 +72,19 @@
 		drawRoute();
 	}
 
+	// Keep the itinerary selected while exposing the full map behind the sheet.
+	function toggleJourneyMap() {
+		if (snap === 'peek') {
+			snap = 'half';
+		} else {
+			snap = 'peek';
+			// Re-fit once the sheet's height animation has completed.
+			window.setTimeout(() => {
+				if (snap === 'peek' && itineraries.length > 0) drawRoute();
+			}, 330);
+		}
+	}
+
 	let currPolylines: Polyline[] = [];
 	let drawToken = 0;
 
@@ -89,7 +102,8 @@
 		return {
 			color: leg.routeColor ? `#${leg.routeColor}` : undefined,
 			weight: 8,
-			opacity: 0.8,
+			opacity: 0.98,
+			casing: true,
 			withArrow: false
 		};
 	}
@@ -262,6 +276,22 @@
 			<p class="min-w-0 flex-1 truncate text-base font-semibold text-black dark:text-white">
 				{headerTitle}
 			</p>
+			{#if hasResults}
+				<button
+					type="button"
+					onclick={toggleJourneyMap}
+					class="inline-flex items-center gap-1 rounded-lg border border-brand-accent/40 bg-brand-accent/10 px-2.5 py-1.5 text-xs font-semibold text-brand-accent hover:bg-brand-accent/20 md:hidden"
+					aria-label={snap === 'peek' ? $t('trip-planner.show_details') : $t('trip-planner.show_map')}
+				>
+					{#if snap === 'peek'}
+						<List class="h-4 w-4" />
+						{$t('trip-planner.show_details')}
+					{:else}
+						<MapIcon class="h-4 w-4" />
+						{$t('trip-planner.show_map')}
+					{/if}
+				</button>
+			{/if}
 			<button
 				type="button"
 				onclick={closePane}

@@ -55,6 +55,13 @@
 	}
 
 	let transportModes = $derived(getTransportModes(itinerary?.legs));
+	// Route numbers distinguish similar-duration bus alternatives at a glance.
+	let routeNumbers = $derived(
+		[...new Set((itinerary?.legs || [])
+			.filter((leg) => leg.mode !== 'WALK')
+			.map((leg) => leg.routeShortName)
+			.filter(Boolean))]
+	);
 	let durationMinutes = $derived(itinerary ? Math.round(itinerary.duration / 60) : 0);
 </script>
 
@@ -77,6 +84,11 @@
 					<AppIcon {icon} class="h-3 w-3" />
 				{/if}
 			{/each}
+		</span>
+	{/if}
+	{#if routeNumbers.length}
+		<span class="max-w-24 truncate text-xs font-bold opacity-90" title={routeNumbers.join(' · ')}>
+			{routeNumbers.join(' · ')}
 		</span>
 	{/if}
 </button>

@@ -38,8 +38,8 @@ function hasMapboxToken() {
 function styleUrl(name) {
 	if (hasMapboxToken()) {
 		// Mapbox vector style JSON references mapbox:// URLs that MapLibre cannot
-		// resolve directly. Render actual Mapbox Streets tiles as a Leaflet basemap.
-		const style = name === DARK_STYLE ? 'dark-v11' : 'streets-v12';
+		// resolve directly. Render the quiet Mapbox Light style as Leaflet tiles.
+		const style = name === DARK_STYLE ? 'dark-v11' : 'light-v11';
 		return 'https://api.mapbox.com/styles/v1/mapbox/' + style + '/tiles/512/{z}/{x}/{y}?access_token=' + encodeURIComponent(env.PUBLIC_MAPBOX_TOKEN);
 	}
 	return 'https://tiles.openfreemap.org/styles/' + name;
@@ -198,6 +198,7 @@ export default class OpenStreetMapProvider {
 			isHighlighted: options.isHighlighted ?? false,
 			isInteractive: options.isInteractive,
 			showRoutesLabel: this.map.getZoom() >= this.showStopsRoutesAtZoom,
+			compact: this.map.getZoom() < 15,
 			emphasis: options.emphasis ?? 'full',
 			dotColor: options.dotColor ?? null
 		});
@@ -237,14 +238,14 @@ export default class OpenStreetMapProvider {
 
 		const shouldShow = this.map.getZoom() >= this.showStopsRoutesAtZoom;
 
-		if (this.routeLabelsVisible === shouldShow) return;
-
 		this.routeLabelsVisible = shouldShow;
-
-		// Batch update all markers
+		// At wide zoom the map should show location context, not 120 overlapping
+		// full-size bus glyphs. Keep selected stops and route dots emphasized.
+		const compact = this.map.getZoom() < 15;
 		for (const marker of this.markersMap.values()) {
 			if (marker?.props) {
 				marker.props.showRoutesLabel = shouldShow;
+				marker.props.compact = compact;
 			}
 		}
 	}

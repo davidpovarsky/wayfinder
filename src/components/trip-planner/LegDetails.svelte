@@ -160,7 +160,7 @@
 		<div class="flex flex-wrap items-center gap-2">
 			{#if !isWalking && leg.routeShortName}
 				<span class={colorStyles.badgeClass} style={colorStyles.badgeStyle}>
-					{leg.routeShortName}
+					{$t('route')} {leg.routeShortName}
 				</span>
 			{/if}
 			<span class="font-semibold text-gray-900 dark:text-white">{leg.headsign}</span>
@@ -243,17 +243,23 @@
 					{#each leg.steps as step}
 						<div class="text-sm">
 							<div class="font-medium text-gray-800 dark:text-gray-200">
-								{step.relativeDirection} on {step.streetName}
+								{#if /[\u0590-\u05ff]/.test(step.streetName || '')}
+									{step.streetName}
+								{:else}
+									{step.relativeDirection} on {step.streetName}
+								{/if}
 							</div>
 							<div class="mt-1 flex flex-wrap gap-x-4 text-gray-500 dark:text-gray-400">
 								<span class="flex items-center gap-1.5">
 									<Ruler class="h-3.5 w-3.5 shrink-0" />
 									{formatDistance(step.distance, $effectiveDistanceUnit, $t)}
 								</span>
-								<span class="flex items-center gap-1.5">
-									<CircleArrowRight class="rotate-rtl h-3.5 w-3.5 shrink-0" />
-									{step.absoluteDirection}
-								</span>
+								{#if step.absoluteDirection}
+									<span class="flex items-center gap-1.5">
+										<CircleArrowRight class="rotate-rtl h-3.5 w-3.5 shrink-0" />
+										{step.absoluteDirection}
+									</span>
+								{/if}
 							</div>
 						</div>
 					{/each}

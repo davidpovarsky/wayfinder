@@ -131,6 +131,28 @@ class APIContractTests(unittest.TestCase):
         encoded=bridge.google_polyline(shape)
         self.assertGreater(len(encoded),500)
 
+    def test_transit_line_numbers_are_preserved_for_wayfinder_badges(self):
+        from otp_adapter import map_response
+        departure={"time":"2026-11-03T16:00:00","place":{"name":"A",
+                    "location":{"lat":31.8,"lng":35.2}}}
+        arrival={"time":"2026-11-03T16:10:00","place":{"name":"B",
+                  "location":{"lat":31.79,"lng":35.21}}}
+        sections=[{"type":"transit","departure":departure,"arrival":arrival,
+                   "travelSummary":{"length":1200,"duration":600},
+                   "transport":{"mode":"bus","shortName":"64","name":"64",
+                                "routeId":10459,"headsign":"גבעת שאול"},
+                   "polyline":""}]
+        itineraries=map_response([{"sections":sections}],
+                                  {"lat":31.8,"lon":35.2},{"lat":31.79,"lon":35.21},
+                                  lambda x: [],lambda x:"")["plan"]["itineraries"]
+        self.assertEqual(len(itineraries),1)
+        leg=itineraries[0]["legs"][0]
+        self.assertEqual(leg["mode"],"BUS")
+        self.assertEqual(leg["routeShortName"],"64")
+        self.assertEqual(leg["route"],"64")
+        self.assertEqual(leg["routeId"],"mot:route:10459")
+        self.assertEqual(leg["headsign"],"גבעת שאול")
+
     def test_planner_unavailable_not_fabricated(self):
         from unittest.mock import patch
         with patch.object(bridge, "fetch_mot", side_effect=bridge.MOTUnavailable("MOT HTTP 503")):

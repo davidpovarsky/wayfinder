@@ -60,10 +60,16 @@ def map_response(raw, origin, destination, decode_polyline, encode_polyline):
             kind=str(section.get("type") or "").lower()
             transport=section.get("transport") or {}
             is_walk=kind in ("walk","walking","pedestrian")
+            # MOT section.type is usually "transit"; vehicle type comes from
+            # transport.mode, not the section kind.
+            vehicle_kind=str(transport.get("mode") or kind).lower()
             mode=("WALK" if is_walk else
-                  "TRAM" if kind in ("light_rail","lightrail","lightRail".lower()) else
-                  "RAIL" if kind in ("train","regionaltrain") else
+                  "TRAM" if vehicle_kind in ("light_rail","lightrail","light-rail","tram") else
+                  "RAIL" if vehicle_kind in ("train","regionaltrain","regional_train") else
                   "BUS")
+            line_number=(str(transport.get("shortName") or transport.get("name") or "").strip()
+                         if not is_walk else "")
+            route_code=transport.get("routeId")
             travel=section.get("travelSummary") or {}
             duration=int(travel.get("duration") or (end-start)//1000)
             distance=float(travel.get("length") or 0)
@@ -84,7 +90,11 @@ def map_response(raw, origin, destination, decode_polyline, encode_polyline):
             legs.append({
                 "startTime":start,"endTime":end,"mode":mode,"transitLeg":not is_walk,
                 "duration":duration,"distance":distance,
-                "route":transport.get("shortName") or transport.get("name"),
+                "route":line_number or None,
+                # Wayfinder's route badge reads routeShortName, NOT "route".
+                "routeShortName":line_number or None,
+                "routeLongName":transport.get("longName"),
+                "routeId":("mot:route:"+str(route_code) if route_code is not None else None),
                 "headsign":transport.get("headsign"),
                 "routeType":0 if mode=="TRAM" else 2 if mode=="RAIL" else 3,
                 "routeColor":str(transport.get("color") or "#1565C0").lstrip("#"),

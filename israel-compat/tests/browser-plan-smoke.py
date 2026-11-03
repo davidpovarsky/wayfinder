@@ -49,6 +49,26 @@ with sync_playwright() as p:
       page.wait_for_timeout(8500)
       print('RESULT_SCREEN',page.locator('body').inner_text()[-1400:].replace('\\n','|'))
       print('RESULT_PAGE_ERRORS',errors[:8])
+      result_text=page.locator('body').inner_text()
+      print('HAS_NUMBERED_BUS_LINE', 'קו ' in result_text)
+      print('ITINERARY_FIRST_TAB',page.locator('.itinerary-tab').first.inner_text().replace('\\n',' | '))
+      map_button=page.get_by_role('button',name='הצג מפה')
+      print('SHOW_MAP_BUTTONS',map_button.count())
+      if map_button.count():
+       sheet=page.locator('[data-testid="bottom-sheet"]').last
+       before_height=sheet.evaluate('(el) => Math.round(el.getBoundingClientRect().height)')
+       map_button.click(timeout=7000)
+       page.wait_for_timeout(2000)
+       after_height=sheet.evaluate('(el) => Math.round(el.getBoundingClientRect().height)')
+       route_paths=page.locator('.leaflet-overlay-pane path.leaflet-interactive').count()
+       light_tiles=page.locator('img.leaflet-tile[src*="light-v11"]').count()
+       compact_markers=page.locator('.emphasis-dot.muted-dot').count()
+       print('MAP_SHEET_BEFORE_AFTER',before_height,after_height,'ROUTE_PATHS',route_paths,'MAPBOX_LIGHT_TILES',light_tiles,'COMPACT_MARKERS',compact_markers)
+       assert after_height<before_height,'Map button failed to expose the map'
+       assert route_paths>0,'Journey polyline missing from route map'
+       assert light_tiles>0,'Mapbox Light did not render'
+       assert 'קו ' in result_text,'Bus route number not displayed'
+
   print('PAGE_ERRORS',errors[:8])
  except Exception as e: print('BROWSER_ERROR',type(e).__name__,str(e)[:330]); print('PAGE_ERRORS',errors[:8])
  finally:b.close()

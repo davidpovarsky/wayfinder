@@ -63,7 +63,9 @@
     "recents": "Recents",
     "clear_all": "נקה הכול",
     "request_failed": "שירות תכנון המסלולים אינו זמין כעת. נסו שוב מאוחר יותר.",
-    "invalid_shared_link": "קישור המסלול אינו תקין."
+    "invalid_shared_link": "קישור המסלול אינו תקין.",
+    "show_map": "הצג מפה",
+    "show_details": "פרטי מסלול"
   },
   "tabs": {
     "stops-and-stations": "תחנות וקווים",
