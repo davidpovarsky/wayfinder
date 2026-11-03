@@ -397,10 +397,13 @@
 		if (!/^mot:route:[1-9]\d{0,7}$/.test(id)) return;
 		hasRestoredSharedRoute = true;
 		try {
-			const response = await fetch('/api/oba/route/' + encodeURIComponent(id));
+			// Wayfinder exposes stops-for-route, not /api/oba/route/{id}.
+			// Reuse its real route references to open the existing interactive sheet.
+			const response = await fetch('/api/oba/stops-for-route/' + encodeURIComponent(id));
 			if (!response.ok) throw new Error('Route lookup HTTP ' + response.status);
 			const body = await response.json();
-			const route = body?.data?.entry;
+			const routes = body?.data?.references?.routes ?? [];
+			const route = routes.find((item: Route) => item.id === id) ?? routes[0];
 			if (!route?.id) throw new Error('Unknown route');
 			await handleRouteClick({ ...route, nullSafeShortName: route.shortName || id });
 		} catch (error) {
