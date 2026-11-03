@@ -385,6 +385,29 @@
 		activeTab = 'stops';
 	}
 
+    let hasRestoredSharedRoute = false;
+
+	// Telegram / Nevo agent deep link: /?route=mot:route:33285.
+	// Open the same interactive route sheet used for a manual route click.
+	async function maybeOpenSharedRoute() {
+		if (hasRestoredSharedRoute || !mapProvider) return;
+		const routeParam = $page.url.searchParams.get('route');
+		if (!routeParam) return;
+		const id = routeParam.startsWith('mot:route:') ? routeParam : 'mot:route:' + routeParam;
+		if (!/^mot:route:[1-9]\d{0,7}$/.test(id)) return;
+		hasRestoredSharedRoute = true;
+		try {
+			const response = await fetch('/api/oba/route/' + encodeURIComponent(id));
+			if (!response.ok) throw new Error('Route lookup HTTP ' + response.status);
+			const body = await response.json();
+			const route = body?.data?.entry;
+			if (!route?.id) throw new Error('Unknown route');
+			await handleRouteClick({ ...route, nullSafeShortName: route.shortName || id });
+		} catch (error) {
+			console.error('Unable to open route deep link:', error);
+		}
+	}
+
 	let hasRestoredSharedTrip = false;
 
 	// Restore a trip shared via the URL. Waits for the map so TripPlan can drop
@@ -402,7 +425,8 @@
 		// "from"/"to" present but unparsable (truncated, corrupted, out of range):
 		// tell the recipient the link didn't work instead of silently falling
 		// back to the default map with no explanation.
-		if (!trip && !hasTripParams(searchParams)) return;
+		const emptyPlannerLink = searchParams.get('plan') === '1';
+		if (!trip && !hasTripParams(searchParams) && !emptyPlannerLink) return;
 
 		hasRestoredSharedTrip = true;
 		try {
@@ -418,7 +442,7 @@
 			await tick();
 			if (trip) {
 				window.dispatchEvent(new CustomEvent('loadSharedTrip', { detail: trip }));
-			} else {
+			} else if (!emptyPlannerLink) {
 				window.dispatchEvent(new CustomEvent('invalidSharedTrip'));
 			}
 		} catch (error) {
@@ -431,6 +455,7 @@
 			mapLoaded = value;
 			if (value && mapProvider) {
 				maybeRestoreSharedTrip();
+				void maybeOpenSharedRoute();
 			}
 		});
 

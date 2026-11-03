@@ -153,6 +153,53 @@ class APIContractTests(unittest.TestCase):
         self.assertEqual(leg["routeId"],"mot:route:10459")
         self.assertEqual(leg["headsign"],"גבעת שאול")
 
+    def test_trip_gps_only_real_time_and_valid_coordinates(self):
+        example={"staticTripId":"584963620_301026","routeLocation":
+                 {"lat":31.816,"lng":35.204},"isRealTime":True}
+        v=bridge.observed_vehicle("mot:trip:34141:test",34141,example,123456)
+        self.assertIsNotNone(v)
+        self.assertEqual(v["position"],{"lat":31.816,"lon":35.204})
+        self.assertEqual(v["activeTripId"],"mot:trip:34141:test")
+        self.assertEqual(v["vehicleId"],"")
+        self.assertTrue(v["predicted"])
+        for changed in ({"isRealTime":False},
+                        {"routeLocation":None},
+                        {"routeLocation":{"lat":0,"lng":0}},
+                        {"staticTripId":None}):
+            bad={**example,**changed}
+            self.assertIsNone(bridge.observed_vehicle("mot:trip:34141:test",34141,bad))
+
+    def test_live_route_positions_deduplicate_same_trip_across_stops(self):
+        from unittest.mock import patch
+        route={"routeId":34141,"routeName":"61","routeDesc":"27061-1-#",
+               "routeLongName":"רמות","agencyId":1,
+               "stops":[{"stopcode":code} for code in (5997,5998,5999,6000,6001)]}
+        row={"isRealTime":True,"staticTripId":"active_123",
+             "arrivalTime":"2026-11-03T20:40:00",
+             "routeLocation":{"lat":31.816,"lng":35.203}}
+        scheduled={"isRealTime":False,"staticTripId":"scheduled_555",
+                   "routeLocation":{"lat":31.816,"lng":35.2}}
+        observations={
+             "5997":{"stopTimes":[row,scheduled]},
+             "5998":{"stopTimes":[row]},
+             "5999":{"stopTimes":[{**row,"staticTripId":"active_456",
+                                       "routeLocation":{"lat":31.817,"lng":35.201}}]},
+             "6000":{"stopTimes":[]},
+             "6001":{"stopTimes":[]}}
+        with patch.object(bridge,"route_details",return_value=route),\
+             patch.object(bridge,"fetch_mot",return_value=observations) as remote:
+            status,body=bridge.path_result(
+                "/api/where/trips-for-route/mot:route:34141.json",{})
+        self.assertEqual(status,200)
+        data=body["data"]
+        self.assertEqual(len(data["list"]),2)
+        self.assertEqual(len(data["references"]["trips"]),2)
+        self.assertEqual(len({x["tripId"] for x in data["list"]}),2)
+        self.assertTrue(all(x["status"]["predicted"] for x in data["list"]))
+        self.assertTrue(all(x["status"]["vehicleId"]=="" for x in data["list"]))
+        self.assertIn("5997",str(remote.call_args.kwargs.get("body")))
+        self.assertFalse(any("scheduled" in x["tripId"] for x in data["list"]))
+
     def test_planner_unavailable_not_fabricated(self):
         from unittest.mock import patch
         with patch.object(bridge, "fetch_mot", side_effect=bridge.MOTUnavailable("MOT HTTP 503")):

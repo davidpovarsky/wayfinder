@@ -242,6 +242,83 @@ def fetch_next_stop_times(live, code):
     return collected
 
 
+def observed_vehicle(trip_id, route_id_value, raw, observed_at=None):
+    """Map authentic MOT per-trip GPS to OBA TripStatus.
+
+    Never treat 'routeLocationAtStop' or unlabelled route-location arrays as a
+    live vehicle. GPS must belong to an actual isRealTime:true prediction.
+    """
+    if raw.get("isRealTime") is not True:
+        return None
+    location=raw.get("routeLocation")
+    if not isinstance(location,dict):
+        return None
+    try:
+        lat,lon=float(location["lat"]),float(location["lng"])
+    except (KeyError,ValueError,TypeError):
+        return None
+    if not (29 <= lat <= 33.5 and 34 <= lon <= 36):
+        return None
+    token=raw.get("staticTripId") or raw.get("tripIdToDate")
+    if token in (None, "", 0, "0"):
+        return None
+    now=observed_at or ms()
+    return {
+        "activeTripId":trip_id, "status":"default", "phase":"in_progress",
+        "predicted":True, "position":{"lat":lat,"lon":lon},
+        "lastKnownLocation":{"lat":lat,"lon":lon},
+        # This is the API observation time, not an invented GPS fix timestamp.
+        "lastUpdateTime":now,
+        # MOT supplies a trip token, not a physical fleet vehicle identifier.
+        # Keep vehicleId empty; Wayfinder keys markers by activeTripId instead.
+        "vehicleId":"",
+    }
+
+
+def route_live_statuses(route_data):
+    """Fetch current trip-bound GPS observations for five spaced stops of a line."""
+    rid=route_id(route_data.get("routeId"))
+    desc=route_data.get("routeDesc")
+    stops=[int(s["stopcode"]) for s in route_data.get("stops",[]) if s.get("stopcode")]
+    if not rid or not desc or not stops:
+        return [],[]
+    count=len(stops)
+    sample=list(dict.fromkeys(stops[i] for i in
+             sorted({0,count//4,count//2,(3*count)//4,count-1})))
+    observations=fetch_mot("scheduler","Routes/GetNextStopTimesAndLocation",
+                           body={"routeDesc":desc,"stopCodes":sample},ttl=17)
+    if not isinstance(observations,dict):
+        raise MOTUnavailable("No vehicle-location response for route")
+    found={}
+    trip_refs={}
+    seen_at=ms()
+    for code,entry in observations.items():
+        if not isinstance(entry,dict):
+            continue
+        for record in entry.get("stopTimes") or []:
+            if not isinstance(record,dict):
+                continue
+            token=record.get("staticTripId") or record.get("tripIdToDate")
+            if token in (None, "", 0, "0"):
+                continue
+            trip_id=f"mot:trip:{rid}:{token}"
+            status=observed_vehicle(trip_id,rid,record,seen_at)
+            if status is None:
+                continue
+            status["closestStop"]=f"mot:stop:{code}"
+            trip_refs[trip_id]={
+                "id":trip_id,"routeId":f"mot:route:{rid}",
+                "tripHeadsign":name(route_data.get("headsign")) or
+                    str(route_data.get("routeLongName") or "").split("<->")[-1],
+                "routeShortName":str(route_data.get("routeName") or ""),
+                "shapeId":f"mot:shape:{rid}",
+            }
+            # The same trip can be reported at multiple sampled stops. One
+            # trip marker only; the physical bus ID is not disclosed by MOT.
+            found.setdefault(trip_id,{"tripId":trip_id,"status":status})
+    return list(found.values()),list(trip_refs.values())
+
+
 def get_arrivals(live, stop_code_number, stop_identifier, min_before=0, min_after=60):
     """Use only genuine time fields; missing real-time data is not an ETA."""
     values, trips = [], {}
@@ -287,6 +364,11 @@ def get_arrivals(live, stop_code_number, stop_identifier, min_before=0, min_afte
             if predicted and a.get("minutesToArrival") is not None:
                 p = current + int(float(a["minutesToArrival"])*60000)
                 arrival.update(predictedArrivalTime=p, predictedDepartureTime=p)
+            live_status=observed_vehicle(trip_id,rid,a,current)
+            if live_status is not None:
+                live_status["closestStop"]=stop_identifier
+                arrival["tripStatus"]=live_status
+                arrival["vehicleId"]=live_status["vehicleId"]
             values.append(arrival)
         except (TypeError, ValueError, OverflowError):
             continue
@@ -474,6 +556,20 @@ def path_result(path, q):
         return 200, envelope({"entry":{"stopId":m[1],"arrivalsAndDepartures":arrivals,
                                         "nearbyStopIds":[],"situationIds":[]},
                               "references":refs(stops=[stop],routes=routes,agencies=agencies,trips=trips)})
+    m = re.fullmatch(r"trips-for-route/([^/]+)\.json", endpoint)
+    if m:
+        rid=route_id(m[1])
+        if not rid:
+            return 404,envelope(None,404,"Invalid route identifier")
+        try:
+            route_data=route_details(rid)
+            list_data,trips=route_live_statuses(route_data)
+        except MOTUnavailable:
+            return 503,envelope(None,503,"Live vehicle data temporarily unavailable")
+        route=route_summary(route_data)
+        return 200,envelope({"list":list_data,"references":refs(
+            routes=[route],trips=trips,
+            agencies=[agency(route_data.get("agencyId"),route_data.get("agencyName"))])})
     m = re.fullmatch(r"route/([^/]+)\.json", endpoint)
     if m:
         rid = route_id(m[1])

@@ -103,6 +103,8 @@
  * @property {{ points?: string | null } | null} [legGeometry] - Encoded polyline of the leg's path
  * @property {string} mode - OTP mode, e.g. "WALK" or "BUS"
  * @property {string | null} [routeColor] - Hex color without the leading `#`
+ * @property {string | null} [routeId] - Source route ID; present on Israeli MOT legs
+ * @property {number} [routeType] - Transit route type, when supplied
  * @property {string | null} [routeLongName]
  * @property {string | null} [routeShortName]
  * @property {string | null} [routeTextColor] - Hex color without the leading `#`

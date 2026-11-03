@@ -13,6 +13,10 @@
 	import { notifications } from '$stores/notificationStore';
 	import { panelFitPadding } from '$lib/mapFitPadding.js';
 	import { calculateMidpoint } from '$lib/mathUtils.js';
+	import {
+		fetchAndUpdateVehiclesForRoutes,
+		removeVehicleMarkersForRoutes
+	} from '$lib/vehicleUtils.js';
 	import type {
 		Itinerary,
 		ItineraryLeg,
@@ -67,9 +71,51 @@
 		expandedSteps = { ...expandedSteps };
 	}
 
+	let vehicleInterval: ReturnType<typeof setInterval> | null = null;
+	let selectedVehicleRoutes: string[] = [];
+	let vehicleRequestGeneration = 0;
+
+	function stopLiveVehicles() {
+		vehicleRequestGeneration++;
+		if (vehicleInterval != null) clearInterval(vehicleInterval);
+		vehicleInterval = null;
+		if (selectedVehicleRoutes.length) {
+			removeVehicleMarkersForRoutes(selectedVehicleRoutes, mapProvider);
+		}
+		selectedVehicleRoutes = [];
+	}
+
+	async function showLiveVehicles() {
+		stopLiveVehicles();
+		const legs = itineraries[activeTab]?.legs ?? [];
+		// Real MOT route IDs are only present for transit legs. Never infer a
+		// live bus's GPS from the route shape or walking leg geometry.
+		const byId = new Map<string, { id: string; type: number }>();
+		const colors = new Map<string, { line: string }>();
+		for (const leg of legs) {
+			if (leg.mode === 'WALK') continue;
+			if (!leg.routeId || !/^mot:route:\d+$/.test(leg.routeId)) continue;
+			byId.set(leg.routeId, { id: leg.routeId, type: leg.routeType ?? 3 });
+			if (leg.routeColor) colors.set(leg.routeId, { line: '#' + leg.routeColor.replace(/^#/, '') });
+		}
+		selectedVehicleRoutes = [...byId.keys()];
+		if (!selectedVehicleRoutes.length) return;
+		const generation = vehicleRequestGeneration;
+		const session = await fetchAndUpdateVehiclesForRoutes(
+			[...byId.values()], mapProvider, { colorsByRouteId: colors }
+		);
+		if (generation !== vehicleRequestGeneration) {
+			clearInterval(session.intervalId);
+			removeVehicleMarkersForRoutes([...byId.keys()], mapProvider);
+			return;
+		}
+		vehicleInterval = session.intervalId;
+	}
+
 	function setActiveTab(index: number) {
 		activeTab = index;
 		drawRoute();
+		void showLiveVehicles();
 	}
 
 	// Keep the itinerary selected while exposing the full map behind the sheet.
@@ -223,7 +269,8 @@
 	 * The mobile plan sheet stays mounted when results are dismissed, so destroy-time
 	 * cleanup alone cannot stop this draw.
 	 */
-	function cancelRouteDraw() {
+    function cancelRouteDraw() {
+		stopLiveVehicles();
 		drawToken++;
 		// Only the ArcGIS provider keeps view padding that needs resetting.
 		mapProvider.resetPadding?.();
@@ -241,8 +288,9 @@
 
 		if (itineraries?.length > 0) {
 			prevItinerariesRef = itineraries;
-			activeTab = 0;
+            activeTab = 0;
 			drawRoute();
+			void showLiveVehicles();
 			return;
 		}
 
