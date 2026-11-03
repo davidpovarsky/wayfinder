@@ -34,3 +34,4 @@ __pycache__/
 *.bak.*
 *.log
 israel-compat/*.pid
+israel-compat/tests/wayfinder-mobile-check.png
