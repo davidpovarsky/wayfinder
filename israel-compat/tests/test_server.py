@@ -38,6 +38,11 @@ class APIContractTests(unittest.TestCase):
         self.assertEqual(s,200)
         self.assertGreater(len(data['data']['list']),0)
 
+    def test_otp_version_negotiation(self):
+        code, payload = bridge.path_result("/otp", {})
+        self.assertEqual(code, 200)
+        self.assertEqual(payload["version"]["major"], 1)
+
     def test_agency_bootstrap(self):
         s,data=bridge.path_result('/api/where/agencies-with-coverage.json',{})
         self.assertEqual(s,200)

@@ -356,6 +356,9 @@ def path_result(path, q):
     root = "/api/where/"
     if path == "/healthz":
         return 200, {"ok": True, "service": "israel-oba-compat", "database": CATALOG.exists()}
+    if path in ("/otp", "/otp/"):
+        # Wayfinder probes this endpoint to select OTP 1.x-compatible REST.
+        return 200, {"version": {"major": 1, "minor": 0}, "service": "israel-otp-compat"}
     if path == "/otp/routers/default/plan":
         try:
             origin,destination,body=otp_adapter.request_payload(q)
