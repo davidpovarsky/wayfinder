@@ -450,13 +450,19 @@
 		}
 	}
 
+	// A cold deep link can hydrate before MapContainer provides its mapProvider.
+	// Store subscription notifications by themselves do not re-run when this
+	// component receives the provider later, so observe BOTH prerequisites.
+	$effect(() => {
+		const ready = mapLoaded && !!mapProvider;
+		if (!ready) return;
+		void maybeRestoreSharedTrip();
+		void maybeOpenSharedRoute();
+	});
+
 	onMount(() => {
 		unsubscribeMapLoaded = isMapLoaded.subscribe((value) => {
 			mapLoaded = value;
-			if (value && mapProvider) {
-				maybeRestoreSharedTrip();
-				void maybeOpenSharedRoute();
-			}
 		});
 
 		window.addEventListener('routeSelectedFromModal', handleRouteSelectedFromModal);
