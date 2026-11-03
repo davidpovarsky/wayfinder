@@ -359,6 +359,37 @@ def path_result(path, q):
     if path in ("/otp", "/otp/"):
         # Wayfinder probes this endpoint to select OTP 1.x-compatible REST.
         return 200, {"version": {"major": 1, "minor": 0}, "service": "israel-otp-compat"}
+    if path == "/geo/search":
+        term=(q.get("query",[""])[0] or "").strip()[:120]
+        if len(term)<2:
+            return 200, {"suggestions":[], "location":None}
+        entries=fetch_mot("planner","AutoComplete/SearchLocations",
+                          {"searchTerm":term},ttl=90)
+        result=[]
+        seen=set()
+        for item in entries or []:
+            coords=item.get("coordinates") or {}
+            try:
+                lat,lon=float(coords["lat"]),float(coords["lng"])
+            except (TypeError,ValueError,KeyError):
+                continue
+            if not (29<=lat<=34 and 34<=lon<=37):
+                continue
+            title=str(item.get("title") or "").strip()
+            if not title:
+                continue
+            key=(title,round(lat,6),round(lon,6))
+            if key in seen:continue
+            seen.add(key)
+            result.append({"id":str(item.get("id") or len(result)),
+                           "name":title,"displayText":title,
+                           "coordinates":{"lat":lat,"lng":lon}})
+            if len(result)>=12:break
+        first=result[0] if result else None
+        location=({"name":first["name"],"formatted_address":first["name"],
+                   "geometry":{"location":first["coordinates"]},
+                   "types":["establishment"]} if first else None)
+        return 200, {"suggestions":result,"location":location}
     if path == "/otp/routers/default/plan":
         try:
             origin,destination,body=otp_adapter.request_payload(q)
@@ -478,7 +509,31 @@ def path_result(path, q):
         # No fake timetables: return explicit empty set when not actually available.
         return 200,envelope({"entry":{"stopId":m[1],"stopRouteSchedules":[],
                                       "date":ms()},"references":refs()})
-    m=re.fullmatch(r"(trip-details|trip|trips-for-route|arrival-and-departure-for-stop)/([^/]+)\.json",endpoint)
+    m=re.fullmatch(r"trip-details/([^/]+)\.json",endpoint)
+    if m:
+        trip_identifier=m[1]
+        if not trip_identifier.startswith("mot:trip:"):
+            return 404,envelope(None,404,"Unknown trip")
+        rid=route_id(trip_identifier)
+        if not rid:
+            return 404,envelope(None,404,"Unknown route")
+        try:
+            route_data=route_details(rid)
+        except MOTUnavailable:
+            return 503,envelope(None,503,"Trip stop pattern temporarily unavailable")
+        route=route_summary(route_data)
+        stops=[serialize_stop(s) for s in route_data.get("stops",[]) if s.get("stopcode")]
+        if not stops:
+            return 200,envelope({"entry":None,"references":refs(routes=[route])})
+        # These are genuine ordered stops on the route, NOT a promise of arrival
+        # times for a particular vehicle. Do not fabricate stop timestamps.
+        entry={"id":trip_identifier,"routeId":route["id"],"status":None,
+               "routeOnly":True,
+               "schedule":{"stopTimes":[{"stopId":s["id"],"arrivalTime":None,
+                                         "departureTime":None} for s in stops]}}
+        return 200,envelope({"entry":entry,"references":refs(stops=stops,routes=[route],
+            agencies=[agency(route_data.get("agencyId"),route_data.get("agencyName"))])})
+    m=re.fullmatch(r"(trip|trips-for-route|arrival-and-departure-for-stop)/([^/]+)\.json",endpoint)
     if m:
         return 200,envelope({"entry":None,"list":[],"references":refs()})
     return 404,envelope(None,404,"Endpoint not implemented: "+endpoint[:80])

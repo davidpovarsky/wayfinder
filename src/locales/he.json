@@ -145,7 +145,7 @@
     "depart_delayed": "Departed {delay} min late",
     "depart_early": "Departed {delay} min early",
     "departed_ontime": "Departed on time",
-    "scheduled_arrival": "Scheduled arriving at",
+    "scheduled_arrival": "הגעה מתוכננת בשעה",
     "scheduled_departure": "Scheduled departure",
     "arrived_at_time": "Arrived at {time}",
     "departed_at_time": "Departed at {time}"
@@ -295,10 +295,10 @@
     "effect_accessibility": "Accessibility issue"
   },
   "arrives_at": "Arrives {time}",
-  "view_stop_information": "View Stop Information",
+  "view_stop_information": "הצגת פרטי התחנה",
   "stop_details": {
     "view_details": "View Details",
-    "stop_info": "Stop Info"
+    "stop_info": "מידע על התחנה"
   },
   "language_switcher": {
     "select_language": "Select language: {language}",
@@ -335,6 +335,8 @@
     "route": "קו",
     "no_stops": "אין מידע על תחנות הנסיעה.",
     "loading": "טוען פרטי נסיעה...",
+    "unavailable": "פרטי הנסיעה אינם זמינים כרגע.",
+    "route_stops_only": "תחנות הקו לפי המסלול הרשמי. זמני מעבר מדויקים לנסיעה זו אינם זמינים.",
     "live_vehicle": "Live · vehicle {vehicleId}",
     "collapsed_stops": "{count, plural, one {# stop} other {# stops}}"
   },

@@ -38,7 +38,7 @@
 
 	const routeNames = $derived(
 		(stop?.routes || [])
-			.map((r) => r?.shortName || r?.code || (r?.id ? String(r.id).split('_').pop() : null))
+			.map((r) => r?.shortName || r?.code || (r?.id ? String(r.id).split(':').at(-1)?.split('_').pop() : null))
 			.filter(Boolean)
 	);
 

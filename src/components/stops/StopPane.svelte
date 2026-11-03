@@ -525,7 +525,7 @@
 						<div class="relative flex flex-col gap-y-1 rounded-lg bg-brand-accent p-4">
 							<h1 class="h1 mb-0 text-white">{stop.name}</h1>
 							<h2 class="h2 mb-0 text-white">
-								{$isLoading ? '' : $t('stop')} #{removeAgencyPrefix(stop.id)}
+								{$isLoading ? '' : $t('stop')} #{stop.code || removeAgencyPrefix(stop.id)}
 							</h2>
 							{#if routeShortNames && routeShortNames.length > 0}
 								<h2 class="h2 mb-0 text-white">

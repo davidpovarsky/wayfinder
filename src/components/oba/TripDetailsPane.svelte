@@ -66,6 +66,12 @@
 			const jsonBody = await response.json();
 			const data = jsonBody.data;
 
+			if (!data?.entry || !data.entry.schedule?.stopTimes?.length) {
+				tripDetails = null;
+				error = $_('trip_details.unavailable');
+				return;
+			}
+			error = null;
 			tripDetails = data.entry;
 
 			if (data?.references?.routes) {
@@ -90,7 +96,10 @@
 
 	onMount(() => {
 		loadTripDetails();
-		interval = setInterval(loadTripDetails, 30000);
+		interval = setInterval(() => {
+			// Route patterns are static; don't poll the same stops forever.
+			if (!tripDetails?.routeOnly && !error) loadTripDetails();
+		}, 30000);
 	});
 
 	onDestroy(() => {
@@ -118,7 +127,12 @@
 				{routeInfo.shortName}
 			</h2>
 		{/if}
-		{#if tripDetails.schedule?.stopTimes.length > 0}
+		{#if tripDetails.routeOnly}
+			<p class="mb-3 text-sm text-gray-600 dark:text-gray-300">
+				{$_('trip_details.route_stops_only')}
+			</p>
+		{/if}
+		{#if tripDetails.schedule?.stopTimes?.length > 0}
 			<div>
 				{#each stopSegments as segment, i (segment.type === 'stop' ? `stop-${segment.index}` : 'collapsed')}
 					{@const isFirst = i === 0}
@@ -199,9 +213,11 @@
 								>
 									{stopInfo[tripStop.stopId] ? stopInfo[tripStop.stopId].name : tripStop.stopId}
 								</div>
-								<div class="text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
-									{formatSecondsFromMidnight(tripStop.arrivalTime)}
-								</div>
+								{#if Number.isFinite(tripStop.arrivalTime) && tripStop.arrivalTime !== null}
+									<div class="text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+										{formatSecondsFromMidnight(tripStop.arrivalTime)}
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}

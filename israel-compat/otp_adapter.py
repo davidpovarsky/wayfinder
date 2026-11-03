@@ -15,8 +15,13 @@ def ms(value):
         d=datetime.fromisoformat(str(value).replace("Z","+00:00"))
         if d.tzinfo is None:
             # Ministry of Transport's local-time timestamps follow Asia/Jerusalem.
-            from zoneinfo import ZoneInfo
-            d=d.replace(tzinfo=ZoneInfo("Asia/Jerusalem"))
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            try:
+                local_zone=ZoneInfo("Asia/Jerusalem")
+            except ZoneInfoNotFoundError:
+                # Windows may lack the IANA tzdata package. Oracle has tzdata.
+                local_zone=datetime.now().astimezone().tzinfo
+            d=d.replace(tzinfo=local_zone)
         return int(d.timestamp()*1000)
     except (ValueError, TypeError, OverflowError):
         return None
@@ -133,15 +138,24 @@ def request_payload(q):
         else:t=datetime.now(tz)
     except Exception:
         t=datetime.now(tz)
+    # The MOT backend requires BOTH optional time keys and route.stop explicitly
+    # present as JSON null, matching the working iOS GetRoutesRequestDTO.
+    # The MOT planner also expects Jerusalem wall time WITHOUT a UTC offset.
+    arriving=q.get("arriveBy",["false"])[0]=="true"
     options={
-        "sortBy":0,"isAccessible":q.get("wheelchair",["false"])[0]=="true",
-        "maxTravelTime":600,"changes":True,"maxWalkTime":120,
+        "isAccessible":q.get("wheelchair",["false"])[0]=="true",
+        "changes":True,
+        "transportations":["bus","privateBus","lightRail","regionalTrain"],
+        "sortBy":0,"maxTravelTime":600,"maxWalkTime":120,
         "transportationsForInitialUse":["bus","carmelit","lightRail","publicTaxi","rahbalit","train"],
-        "transportations":["bus","privateBus","lightRail","regionalTrain"]
+        "arrivalTime":t.strftime("%Y-%m-%dT%H:%M:%S") if arriving else None,
+        "departureTime":None if arriving else t.strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    field="arrivalTime" if q.get("arriveBy",["false"])[0]=="true" else "departureTime"
-    options[field]=t.isoformat(timespec="seconds")
-    address=lambda p:{"coordinates":{"lat":p["lat"],"lng":p["lon"]},"addressDetails":{"label":"מוצא"}}
-    body={"route":{"origin":address(origin),"destination":address(destination),"options":options},
-          "returnedRouteOptions":{"language":"he","isFutureSearch":True}}
+    address=lambda p,label:{"addressDetails":{"label":label},
+                             "coordinates":{"lat":p["lat"],"lng":p["lon"]}}
+    body={"route":{"origin":address(origin,"Origin"),
+                   "destination":address(destination,"Destination"),
+                   "stop":None,"options":options},
+          "returnedRouteOptions":{"language":"he",
+                                  "isFutureSearch":t.timestamp()>=datetime.now(tz).timestamp()-60}}
     return origin,destination,body

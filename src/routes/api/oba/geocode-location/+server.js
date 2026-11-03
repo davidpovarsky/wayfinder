@@ -1,5 +1,6 @@
 import { bingGeocode, googleGeocode } from '$lib/geocoder';
 import { getBoundsCache } from '$lib/serverCache.js';
+import { getIsraelPlaces, isIsraelTransit } from '$lib/server/israelGeocoder';
 
 import { PRIVATE_OBA_GEOCODER_PROVIDER as geocoderProvider } from '$env/static/private';
 import { error } from '@sveltejs/kit';
@@ -35,7 +36,9 @@ export async function GET({ url }) {
 	}
 
 	try {
-		const locationResponse = await locationSearch(searchInput, bounds);
+		const locationResponse = isIsraelTransit() && !geocoderApiKey
+			? (await getIsraelPlaces(searchInput)).location
+			: await locationSearch(searchInput, bounds);
 
 		return new Response(JSON.stringify({ location: locationResponse }), {
 			headers: { 'Content-Type': 'application/json' }

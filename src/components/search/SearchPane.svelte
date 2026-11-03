@@ -517,7 +517,7 @@
 						<SearchResultItem
 							onclick={() => handleRouteClick(route)}
 							icon={prioritizedRouteTypeForDisplay(route.type)}
-							title={`${$t('route')} ${removeAgencyPrefix(route.nullSafeShortName || route.id)}`}
+							title={`${$t('route')} ${route.shortName || removeAgencyPrefix(route.nullSafeShortName || route.id)}`}
 							subtitle={route.description}
 						/>
 					{/each}

@@ -43,6 +43,50 @@ class APIContractTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(payload["version"]["major"], 1)
 
+    def test_ios_exact_route_payload(self):
+        from otp_adapter import request_payload
+        src,dest,payload=request_payload({
+            "fromPlace":["31.816342207,35.203175915"],
+            "toPlace":["31.78948,35.22441"],
+            "date":["11-03-2026"],"time":["5:30 PM"]})
+        route=payload["route"]
+        self.assertIn("stop",route)
+        self.assertIsNone(route["stop"])
+        self.assertIsNone(route["options"]["arrivalTime"])
+        self.assertEqual(route["options"]["departureTime"],"2026-11-03T17:30:00")
+        self.assertEqual(route["origin"]["addressDetails"]["label"],"Origin")
+        self.assertNotIn("+02:00",route["options"]["departureTime"])
+        self.assertEqual(payload["returnedRouteOptions"]["language"],"he")
+
+    def test_mot_address_autocomplete(self):
+        from unittest.mock import patch
+        places=[{"title":"בית ישראל, ירושלים","id":"a","coordinates":{
+                    "lat":31.78948,"lng":35.22441}},
+                {"title":"מחוץ לישראל","coordinates":{"lat":40,"lng":-1}}]
+        with patch.object(bridge,"fetch_mot",return_value=places) as remote:
+            status,body=bridge.path_result("/geo/search",{"query":["בית ישראל"]})
+        self.assertEqual(status,200)
+        self.assertEqual(len(body["suggestions"]),1)
+        self.assertEqual(body["suggestions"][0]["name"],"בית ישראל, ירושלים")
+        self.assertAlmostEqual(body["location"]["geometry"]["location"]["lat"],31.78948)
+        remote.assert_called_once()
+
+    def test_trip_details_use_real_stop_pattern_no_invented_times(self):
+        from unittest.mock import patch
+        route={"routeId":33285,"routeName":"31","routeLongName":"גילה",
+               "agencyId":1,"stops":[
+                    {"stopcode":5997,"stopid":11622,"name":{"he":"ליפסקי"},"lat":31.8,"lng":35.2},
+                    {"stopcode":5998,"stopid":11623,"name":{"he":"השקד"},"lat":31.79,"lng":35.21}]}
+        with patch.object(bridge,"route_details",return_value=route):
+            status,body=bridge.path_result(
+                "/api/where/trip-details/mot:trip:33285:123456789.json",{})
+        self.assertEqual(status,200)
+        entry=body["data"]["entry"]
+        self.assertTrue(entry["routeOnly"])
+        self.assertEqual(len(entry["schedule"]["stopTimes"]),2)
+        self.assertIsNone(entry["schedule"]["stopTimes"][0]["arrivalTime"])
+        self.assertEqual(body["data"]["references"]["stops"][0]["name"],"ליפסקי")
+
     def test_agency_bootstrap(self):
         s,data=bridge.path_result('/api/where/agencies-with-coverage.json',{})
         self.assertEqual(s,200)

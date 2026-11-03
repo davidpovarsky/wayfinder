@@ -1,6 +1,7 @@
 import oba from '$lib/obaSdk.js';
 import { bingGeocode, googleGeocode } from '$lib/geocoder';
 import { getBoundsCache } from '$lib/serverCache.js';
+import { getIsraelPlaces, isIsraelTransit } from '$lib/server/israelGeocoder';
 import { getAgencyFilter, filterRoutes, filterStops } from '$lib/agencyFilter.js';
 
 import {
@@ -33,8 +34,11 @@ async function stopSearch(query) {
 }
 
 async function locationSearch(query, bounds) {
-	// Israel uses the MOT local station catalogue when no Google/Bing geocoder is configured.
-	if (!geocoderApiKey) return [];
+	// Resolve real Israeli places via MOT instead of silently returning no results.
+	if (isIsraelTransit() && !geocoderApiKey) {
+		return (await getIsraelPlaces(query)).location;
+	}
+	if (!geocoderApiKey) return null;
 	if (geocoderProvider === 'google') {
 		return googleGeocode({ apiKey: geocoderApiKey, query, bounds });
 	} else if (geocoderProvider === 'bing') {

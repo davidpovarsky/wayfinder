@@ -441,7 +441,8 @@
 	 */
 	function handleLocationObtained(latitude, longitude) {
 		if (!mapInstance) return;
-		mapInstance.setCenter({ lat: latitude, lng: longitude });
+		// Zoom into street level, offsetting the point above the Telegram bottom sheet.
+		mapInstance.flyTo(latitude, longitude, 17, { offsetY: 0.12, animate: true });
 		mapInstance.addUserLocationMarker({ lat: latitude, lng: longitude });
 		userLocation.set({ lat: latitude, lng: longitude });
 	}

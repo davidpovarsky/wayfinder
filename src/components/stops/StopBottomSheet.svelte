@@ -61,7 +61,7 @@
 	// both optional, so build the parts list and join only what's present.
 	let subtitle = $derived(
 		[
-			`${$isLoading ? '' : $t('stop')} #${removeAgencyPrefix(stop.id)}`,
+			`${$isLoading ? '' : $t('stop')} #${stop.code || removeAgencyPrefix(stop.id)}`,
 			stop.direction && !$isLoading
 				? $t('direction_bound', {
 						values: { direction: directionLabel(stop.direction, $t) }

@@ -335,6 +335,8 @@
 		"route": "Route",
 		"no_stops": "No stop times available for this trip.",
 		"loading": "Loading trip details...",
+    "unavailable": "Trip details are not available at the moment.",
+    "route_stops_only": "Official route stop sequence. Trip-specific stop arrival times are not available.",
 		"live_vehicle": "Live · vehicle {vehicleId}",
 		"collapsed_stops": "{count, plural, one {# stop} other {# stops}}"
 	},
