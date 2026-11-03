@@ -71,7 +71,7 @@
 		expandedSteps = { ...expandedSteps };
 	}
 
-	let vehicleInterval: ReturnType<typeof setInterval> | null = null;
+	let vehicleInterval: number | null = null;
 	let selectedVehicleRoutes: string[] = [];
 	let vehicleRequestGeneration = 0;
 
