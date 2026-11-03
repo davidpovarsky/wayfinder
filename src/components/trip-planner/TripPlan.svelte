@@ -154,7 +154,14 @@
 		}
 
 		try {
-			const response = await geocodeLocation(suggestion.name);
+			// MOT suggestions include verified coordinates. Use the exact selected
+			// suggestion rather than geocoding its potentially ambiguous name again.
+			const direct = suggestion?.coordinates;
+			const coordinates =
+				direct && Number.isFinite(Number(direct.lat)) && Number.isFinite(Number(direct.lng))
+					? { lat: Number(direct.lat), lng: Number(direct.lng) }
+					: (await geocodeLocation(suggestion.name)).location?.geometry?.location;
+			if (!coordinates) throw new Error('Selected location has no coordinates');
 
 			const isStale = isFrom
 				? currentRequestId !== fromRequestId
@@ -168,14 +175,14 @@
 				if (fromMarker) {
 					mapProvider.removePinMarker(fromMarker);
 				}
-				selectedFrom = response.location.geometry.location;
+				selectedFrom = coordinates;
 				fromMarker = mapProvider.addPinMarker(selectedFrom, $t('trip-planner.from'));
 				fromPlace = suggestion.name;
 			} else {
 				if (toMarker) {
 					mapProvider.removePinMarker(toMarker);
 				}
-				selectedTo = response.location.geometry.location;
+				selectedTo = coordinates;
 				toMarker = mapProvider.addPinMarker(selectedTo, $t('trip-planner.to'));
 				toPlace = suggestion.name;
 			}
