@@ -31,13 +31,18 @@ import { polygonsOf } from '$lib/MapHelpers/zoneGeometry.js';
 const LIGHT_STYLE = 'positron';
 const DARK_STYLE = 'fiord';
 
+function hasMapboxToken() {
+	return typeof env.PUBLIC_MAPBOX_TOKEN === 'string' && env.PUBLIC_MAPBOX_TOKEN.startsWith('pk.');
+}
+
 function styleUrl(name) {
-	const token = env.PUBLIC_MAPBOX_TOKEN;
-	if (typeof token === 'string' && token.startsWith('pk.')) {
+	if (hasMapboxToken()) {
+		// Mapbox vector style JSON references mapbox:// URLs that MapLibre cannot
+		// resolve directly. Render actual Mapbox Streets tiles as a Leaflet basemap.
 		const style = name === DARK_STYLE ? 'dark-v11' : 'streets-v12';
-		return `https://api.mapbox.com/styles/v1/mapbox/${style}?access_token=${encodeURIComponent(token)}`;
+		return 'https://api.mapbox.com/styles/v1/mapbox/' + style + '/tiles/512/{z}/{x}/{y}?access_token=' + encodeURIComponent(env.PUBLIC_MAPBOX_TOKEN);
 	}
-	return `https://tiles.openfreemap.org/styles/${name}`;
+	return 'https://tiles.openfreemap.org/styles/' + name;
 }
 
 // activeTrip is always truthy here: the sole caller (vehicleUtils.js) guards on
@@ -124,11 +129,7 @@ export default class OpenStreetMapProvider {
 		// Record the applied style URL so setTheme() can skip a redundant layer
 		// rebuild when the theme already matches the boot style (see setTheme).
 		this.currentStyleUrl = styleUrl(this.maplibreLayer);
-		this.maplibreLayer = this.L.maplibreGL({
-			style: this.currentStyleUrl,
-			interactive: true,
-			dragRotate: false
-		}).addTo(this.map);
+		this.maplibreLayer = this.createBaseMapLayer(this.currentStyleUrl).addTo(this.map);
 
 		// Update route labels (on stops) visibility on zoom changes
 		this.map.on('zoomend', () => {
@@ -146,6 +147,16 @@ export default class OpenStreetMapProvider {
 		}
 		this.map.createPane(ZONE_PANE);
 		this.map.getPane(ZONE_PANE).style.zIndex = String(ZONE_PANE_Z_INDEX);
+	}
+
+	createBaseMapLayer(url) {
+		if (hasMapboxToken()) {
+			return this.L.tileLayer(url, {
+				tileSize: 512, zoomOffset: -1, maxZoom: 21, maxNativeZoom: 19,
+				attribution: '&copy; Mapbox &copy; OpenStreetMap'
+			});
+		}
+		return this.L.maplibreGL({ style: url, interactive: true, dragRotate: false });
 	}
 
 	eventListeners(mapInstance, debouncedLoadMarkers) {
@@ -764,9 +775,7 @@ export default class OpenStreetMapProvider {
 			this.map.removeLayer(this.maplibreLayer);
 		}
 
-		this.maplibreLayer = this.L.maplibreGL({
-			style: url
-		}).addTo(this.map);
+		this.maplibreLayer = this.createBaseMapLayer(url).addTo(this.map);
 	}
 
 	/**

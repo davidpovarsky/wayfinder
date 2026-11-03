@@ -35,6 +35,9 @@
 		initSystemTheme();
 
 		locale.subscribe((lang) => {
+			if (!lang) return;
+			document.documentElement.lang = lang;
+			document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
 			let classList = document.documentElement.classList;
 			if (isRTL(lang)) {
 				classList.add('rtl');

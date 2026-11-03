@@ -50,10 +50,12 @@ export const languages = [
 
 // English loaded synchronously as the fallback locale
 import english from '../locales/en.json';
+import hebrew from '../locales/he.json';
 
 // Named because init() below must bootstrap on this synchronously-loaded locale.
 const FALLBACK_LOCALE = 'en';
 addMessages(FALLBACK_LOCALE, english);
+addMessages('he', hebrew);
 
 // Other locales registered with lazy loaders
 register('am', () => import('../locales/am.json').then((m) => m.default));
@@ -62,7 +64,7 @@ register('es', () => import('../locales/es.json').then((m) => m.default));
 register('fa', () => import('../locales/fa.json').then((m) => m.default));
 register('fr', () => import('../locales/fr.json').then((m) => m.default));
 register('hi', () => import('../locales/hi.json').then((m) => m.default));
-register('he', () => import('../locales/he.json').then((m) => m.default));
+// Hebrew is loaded eagerly for the Israel deployment.
 register('ht', () => import('../locales/ht.json').then((m) => m.default));
 register('ja', () => import('../locales/ja.json').then((m) => m.default));
 register('km', () => import('../locales/km.json').then((m) => m.default));
@@ -110,7 +112,7 @@ export function getInitialLocale() {
 // anything renders.
 init({
 	fallbackLocale: FALLBACK_LOCALE,
-	initialLocale: FALLBACK_LOCALE
+	initialLocale: env.PUBLIC_DEFAULT_LOCALE === 'he' ? 'he' : FALLBACK_LOCALE
 });
 
 // Client-only: switch to the visitor's preferred locale. locale.set() leaves the
