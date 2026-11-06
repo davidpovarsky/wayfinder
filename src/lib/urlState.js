@@ -68,6 +68,54 @@ export function hasTripParams(searchParams) {
 }
 
 /**
+ * Parse an optional Israel-local departure/arrival time from shared links.
+ * Two accepted forms:
+ *   date=2026-11-08&time=09:30
+ *   departAt=2026-11-08T09:30
+ * Optional arriveBy=true|false|1|0 changes departure to arrival search.
+ * These are LOCAL Asia/Jerusalem wall-clock values, not UTC instants.
+ *
+ * @param {URLSearchParams} params
+ * @returns {{departureType: 'departAt'|'arriveBy',departureDate:string,departureTime:string} | undefined | null}
+ *   undefined: no schedule supplied; null: supplied but invalid.
+ */
+export function parseTripScheduleParams(params) {
+	if (!params) return undefined;
+	const hasSchedule = ['date', 'time', 'departAt', 'arriveBy'].some((name) => params.has(name));
+	if (!hasSchedule) return undefined;
+	const shortcut = params.get('departAt');
+	if (shortcut !== null && (params.has('date') || params.has('time'))) return null;
+	const match = shortcut !== null ? /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(shortcut) : null;
+	if (shortcut !== null && !match) return null;
+	const date = match ? match[1] : params.get('date');
+	const time = match ? match[2] : params.get('time');
+	if (
+		!date ||
+		!time ||
+		!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+		!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)
+	)
+		return null;
+	const [year, month, day] = date.split('-').map(Number);
+	if (
+		year < 2000 ||
+		year > 2100 ||
+		month < 1 ||
+		month > 12 ||
+		day < 1 ||
+		day > new Date(Date.UTC(year, month, 0)).getUTCDate()
+	)
+		return null;
+	const rawArrive = params.get('arriveBy');
+	if (rawArrive !== null && !['0', '1', 'true', 'false'].includes(rawArrive)) return null;
+	return {
+		departureType: rawArrive === '1' || rawArrive === 'true' ? 'arriveBy' : 'departAt',
+		departureDate: date,
+		departureTime: time
+	};
+}
+
+/**
  * Reads trip context from URL search params.
  *
  * @param {URLSearchParams} searchParams
@@ -81,6 +129,8 @@ export function parseTripParams(searchParams) {
 	const selectedTo = parseCoord(searchParams.get('to'));
 
 	if (!selectedFrom || !selectedTo) return null;
+	const schedule = parseTripScheduleParams(searchParams);
+	if (schedule === null) return null;
 
 	const fromName = searchParams.get('fromName');
 	const toName = searchParams.get('toName');
@@ -89,7 +139,8 @@ export function parseTripParams(searchParams) {
 		selectedFrom,
 		selectedTo,
 		fromPlace: fromName || formatCoord(selectedFrom),
-		toPlace: toName || formatCoord(selectedTo)
+		toPlace: toName || formatCoord(selectedTo),
+		...(schedule || {})
 	};
 }
 
@@ -122,6 +173,24 @@ export function applyTripParams(url, trip) {
 		url.searchParams.delete('toName');
 	}
 
+	// Avoid stale timestamps when sharing "leave now" or replanning after a
+	// previous scheduled journey. Only keep a fully valid schedule.
+	for (const name of ['date', 'time', 'departAt', 'arriveBy']) url.searchParams.delete(name);
+	const kind = trip.departureType;
+	if (kind === 'departAt' || kind === 'arriveBy') {
+		const schedule = parseTripScheduleParams(
+			new URLSearchParams({
+				date: trip.departureDate || '',
+				time: trip.departureTime || '',
+				arriveBy: kind === 'arriveBy' ? 'true' : 'false'
+			})
+		);
+		if (schedule) {
+			url.searchParams.set('date', schedule.departureDate);
+			url.searchParams.set('time', schedule.departureTime);
+			if (kind === 'arriveBy') url.searchParams.set('arriveBy', 'true');
+		}
+	}
 	return url;
 }
 
@@ -136,6 +205,7 @@ export function removeTripParams(url) {
 	url.searchParams.delete('to');
 	url.searchParams.delete('fromName');
 	url.searchParams.delete('toName');
+	for (const name of ['date', 'time', 'departAt', 'arriveBy']) url.searchParams.delete(name);
 	return url;
 }
 

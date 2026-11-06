@@ -5,6 +5,7 @@ import {
 	formatCoord,
 	parseCoord,
 	parseTripParams,
+	parseTripScheduleParams,
 	applyTripParams,
 	removeTripParams,
 	hasTripParams,
@@ -90,6 +91,91 @@ describe('parseTripParams', () => {
 		expect(parseTripParams(new URLSearchParams('from=bad&to=32.8,-117.2'))).toBeNull();
 		expect(parseTripParams(new URLSearchParams())).toBeNull();
 		expect(parseTripParams(null)).toBeNull();
+	});
+});
+
+describe('shared trip departure/arrival schedule', () => {
+	it('parses Israel-local date/time and optional arriveBy', () => {
+		expect(parseTripScheduleParams(new URLSearchParams('date=2026-11-08&time=09:30'))).toEqual({
+			departureType: 'departAt',
+			departureDate: '2026-11-08',
+			departureTime: '09:30'
+		});
+		expect(
+			parseTripScheduleParams(new URLSearchParams('departAt=2026-11-08T09:30&arriveBy=true'))
+		).toEqual({
+			departureType: 'arriveBy',
+			departureDate: '2026-11-08',
+			departureTime: '09:30'
+		});
+		expect(parseTripScheduleParams(new URLSearchParams())).toBeUndefined();
+	});
+
+	it('rejects incomplete, impossible and ambiguous timestamp values', () => {
+		for (const query of [
+			'date=2026-11-08',
+			'time=09:30',
+			'date=2026-11-08&time=9:30',
+			'date=2026-11-08&time=24:00',
+			'date=2026-11-08&time=09:60',
+			'date=2026-02-29&time=09:30',
+			'date=2026-11-31&time=09:30',
+			'date=2026-11-08&time=09:30%2B02%3A00',
+			'departAt=2026-11-08T09:30Z',
+			'departAt=2026-11-08T09:30%2B02%3A00',
+			'date=2026-11-08&time=09:30&arriveBy=maybe',
+			'departAt=2026-11-08T09:30&time=09:30'
+		]) {
+			expect(parseTripScheduleParams(new URLSearchParams(query)), query).toBeNull();
+		}
+		expect(parseTripScheduleParams(new URLSearchParams('date=2028-02-29&time=00:00'))).toEqual({
+			departureType: 'departAt',
+			departureDate: '2028-02-29',
+			departureTime: '00:00'
+		});
+	});
+
+	it('parses a full scheduled route link while keeping old links compatible', () => {
+		const loc = 'from=31.816586,35.202785&to=31.788564,35.224251';
+		expect(parseTripParams(new URLSearchParams(loc))).not.toHaveProperty('departureType');
+		expect(parseTripParams(new URLSearchParams(loc + '&date=2026-11-08&time=09:30'))).toMatchObject(
+			{
+				selectedFrom: { lat: 31.816586, lng: 35.202785 },
+				departureType: 'departAt',
+				departureDate: '2026-11-08',
+				departureTime: '09:30'
+			}
+		);
+		expect(parseTripParams(new URLSearchParams(loc + '&date=2026-11-31&time=09:30'))).toBeNull();
+	});
+
+	it('writes, reads and clears the scheduled time with other trip URL state', () => {
+		const url = new URL('https://example.org/?keep=yes');
+		const trip = {
+			selectedFrom: { lat: 31.8, lng: 35.2 },
+			selectedTo: { lat: 31.79, lng: 35.23 },
+			departureType: 'arriveBy',
+			departureDate: '2026-11-08',
+			departureTime: '09:30'
+		};
+		applyTripParams(url, trip);
+		expect(url.searchParams.get('date')).toBe('2026-11-08');
+		expect(url.searchParams.get('time')).toBe('09:30');
+		expect(url.searchParams.get('arriveBy')).toBe('true');
+		expect(parseTripParams(url.searchParams)).toMatchObject({
+			departureType: 'arriveBy',
+			departureDate: '2026-11-08',
+			departureTime: '09:30'
+		});
+		applyTripParams(url, { ...trip, departureType: 'now' });
+		expect(url.searchParams.has('date')).toBe(false);
+		expect(url.searchParams.has('time')).toBe(false);
+		expect(url.searchParams.has('arriveBy')).toBe(false);
+		applyTripParams(url, trip);
+		removeTripParams(url);
+		expect(url.searchParams.get('keep')).toBe('yes');
+		for (const key of ['from', 'to', 'fromName', 'toName', 'date', 'time', 'departAt', 'arriveBy'])
+			expect(url.searchParams.has(key)).toBe(false);
 	});
 });
 

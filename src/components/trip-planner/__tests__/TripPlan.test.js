@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import TripPlan from '../TripPlan.svelte';
 import * as navigation from '$app/navigation';
+import { tripOptions } from '$stores/tripOptionsStore';
 
 vi.mock('$app/environment', () => ({
 	browser: true,
@@ -282,6 +283,7 @@ describe('TripPlan shared URL round trip', () => {
 	});
 
 	afterEach(() => {
+		tripOptions.resetSession();
 		vi.clearAllMocks();
 		delete global.fetch;
 	});
@@ -316,6 +318,55 @@ describe('TripPlan shared URL round trip', () => {
 		expect(url.searchParams.get('fromName')).toBe('Home');
 		expect(url.searchParams.get('toName')).toBe('Work');
 
+		unmount();
+	});
+
+	it('restores a scheduled departure and sends it in the OTP request before planning', async () => {
+		mockPlanSuccess();
+		const { unmount } = render(TripPlan, { props });
+		window.dispatchEvent(
+			new CustomEvent('loadSharedTrip', {
+				detail: {
+					...sharedTrip,
+					departureType: 'departAt',
+					departureDate: '2026-11-08',
+					departureTime: '09:30'
+				}
+			})
+		);
+		await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+		const request = new URL(global.fetch.mock.calls[0][0], 'https://example.org');
+		expect(request.searchParams.get('date')).toBe('11-08-2026');
+		expect(request.searchParams.get('time')).toMatch(/9:30\s*AM/i);
+		expect(request.searchParams.get('arriveBy')).toBe('false');
+		await waitFor(() => expect(navigation.replaceState).toHaveBeenCalled());
+		const shared = navigation.replaceState.mock.calls.at(-1)[0];
+		expect(shared.searchParams.get('date')).toBe('2026-11-08');
+		expect(shared.searchParams.get('time')).toBe('09:30');
+		unmount();
+	});
+
+	it('restores an arrive-by search and preserves it in the shared URL', async () => {
+		mockPlanSuccess();
+		const { unmount } = render(TripPlan, { props });
+		window.dispatchEvent(
+			new CustomEvent('loadSharedTrip', {
+				detail: {
+					...sharedTrip,
+					departureType: 'arriveBy',
+					departureDate: '2026-11-08',
+					departureTime: '17:15'
+				}
+			})
+		);
+		await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+		const request = new URL(global.fetch.mock.calls[0][0], 'https://example.org');
+		expect(request.searchParams.get('arriveBy')).toBe('true');
+		expect(request.searchParams.get('date')).toBe('11-08-2026');
+		await waitFor(() => expect(navigation.replaceState).toHaveBeenCalled());
+		const shared = navigation.replaceState.mock.calls.at(-1)[0];
+		expect(shared.searchParams.get('arriveBy')).toBe('true');
+		expect(shared.searchParams.get('time')).toBe('17:15');
 		unmount();
 	});
 

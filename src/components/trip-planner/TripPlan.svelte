@@ -294,7 +294,15 @@
 		try {
 			const base = window?.location?.href || $page.url;
 			const url = new URL(base);
-			applyTripParams(url, { selectedFrom, selectedTo, fromPlace, toPlace });
+			applyTripParams(url, {
+				selectedFrom,
+				selectedTo,
+				fromPlace,
+				toPlace,
+				departureType: $tripOptions.departureType,
+				departureDate: $tripOptions.departureDate,
+				departureTime: $tripOptions.departureTime
+			});
 			// using `resolve` would drop trip params
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			replaceState(url, {});
@@ -393,7 +401,20 @@
 	// itself already can't throw, but this also guards the destructuring above it.
 	async function handleLoadSharedTrip(e) {
 		try {
-			const { selectedFrom: from, selectedTo: to, fromPlace: fp, toPlace: tp } = e.detail;
+			const {
+				selectedFrom: from,
+				selectedTo: to,
+				fromPlace: fp,
+				toPlace: tp,
+				departureType = 'now',
+				departureDate = null,
+				departureTime = null
+			} = e.detail;
+			// Set BEFORE planTrip() reads $tripOptions and generates OTP parameters.
+			// An ordinary from/to link resets any prior scheduled trip to "now".
+			tripOptions.setSession('departureType', departureType);
+			tripOptions.setSession('departureDate', departureDate);
+			tripOptions.setSession('departureTime', departureTime);
 			fromPlace = fp;
 			toPlace = tp;
 			selectedFrom = from;
